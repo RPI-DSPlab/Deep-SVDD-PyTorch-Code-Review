@@ -79,7 +79,7 @@ class DeepSVDD(object):
             self.trainer = DeepSVDDTrainer(self.objective, self.R, self.c, self.nu,
                                            device=device, n_jobs_dataloader=n_jobs_dataloader)
 
-        self.trainer.test(dataset, self.net)
+        self.trainer.test(dataset, self.net, is_during_train=False)
         # Get results
         self.results['test_auc'] = self.trainer.test_auc
         self.results['test_time'] = self.trainer.test_time
@@ -96,7 +96,7 @@ class DeepSVDD(object):
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
                                     n_jobs_dataloader=n_jobs_dataloader)
         self.ae_net = self.ae_trainer.train(dataset, self.ae_net)
-        self.ae_trainer.test(dataset, self.ae_net)
+        self.ae_trainer.test(dataset, self.ae_net, is_during_train=False)
         self.init_network_weights_from_pretraining()
 
     def init_network_weights_from_pretraining(self):

@@ -34,14 +34,10 @@ class AETrainer(BaseTrainer):
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
 
         # Training
-        logger.info('Starting pretraining...')
+        logger.info(f'Starting pretraining on {self.device}...')
         start_time = time.time()
         ae_net.train()
         for epoch in range(self.n_epochs):
-
-            scheduler.step()
-            if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
 
             loss_epoch = 0.0
             n_batches = 0
@@ -63,10 +59,23 @@ class AETrainer(BaseTrainer):
                 loss_epoch += loss.item()
                 n_batches += 1
 
+            # Step the scheduler and log the current learning rate
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_last_lr()[0]))
+
+            # Test after epoch
+            test_auc, test_loss, test_time = self.test(dataset, ae_net, is_during_train=True)
+
             # log epoch statistics
             epoch_train_time = time.time() - epoch_start_time
-            logger.info('  Epoch {}/{}\t Time: {:.3f}\t Loss: {:.8f}'
-                        .format(epoch + 1, self.n_epochs, epoch_train_time, loss_epoch / n_batches))
+            logger.info(
+                f"Epoch: {epoch + 1}/{self.n_epochs}\n"
+                f"\t  Time:       {epoch_train_time:.3f} sec\n"
+                f"\t  Train Loss: {loss_epoch / n_batches:.8f}\n"
+                f"\t  Test Loss:  {test_loss:.8f}\n"
+                f"\t  Test AUC:   {test_auc:.2f}\n"
+            )
 
         pretrain_time = time.time() - start_time
         logger.info('Pretraining time: %.3f' % pretrain_time)
@@ -74,7 +83,7 @@ class AETrainer(BaseTrainer):
 
         return ae_net
 
-    def test(self, dataset: BaseADDataset, ae_net: BaseNet):
+    def test(self, dataset: BaseADDataset, ae_net: BaseNet, is_during_train: bool):
         logger = logging.getLogger()
 
         # Set device for network
@@ -84,7 +93,8 @@ class AETrainer(BaseTrainer):
         _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
 
         # Testing
-        logger.info('Testing autoencoder...')
+        if not is_during_train:
+            logger.info('Testing autoencoder...')
         loss_epoch = 0.0
         n_batches = 0
         start_time = time.time()
@@ -106,15 +116,17 @@ class AETrainer(BaseTrainer):
                 loss_epoch += loss.item()
                 n_batches += 1
 
-        logger.info('Test set Loss: {:.8f}'.format(loss_epoch / n_batches))
-
         _, labels, scores = zip(*idx_label_score)
         labels = np.array(labels)
         scores = np.array(scores)
 
         auc = roc_auc_score(labels, scores)
-        logger.info('Test set AUC: {:.2f}%'.format(100. * auc))
 
         test_time = time.time() - start_time
-        logger.info('Autoencoder testing time: %.3f' % test_time)
-        logger.info('Finished testing autoencoder.')
+        if not is_during_train:
+            logger.info('Test set Loss: {:.8f}'.format(loss_epoch / n_batches))
+            logger.info('Test set AUC: {:.2f}%'.format(100. * auc))
+            logger.info('Autoencoder testing time: %.3f' % test_time)
+            logger.info('Finished testing autoencoder.')
+
+        return 100. * auc, loss_epoch / n_batches, test_time
