@@ -117,6 +117,17 @@ class DeepSVDDTrainer(BaseTrainer):
         return net
 
     def test(self, dataset: BaseADDataset, net: BaseNet, is_during_train: bool):
+        """
+        Test the model with the provided dataset.
+
+        Parameters:
+        dataset (BaseADDataset): The dataset to use for testing.
+        net (BaseNet): The neural network model to use for prediction.
+        is_during_train (bool): Flag indicating whether the function is being called during training.
+
+        Returns:
+        float: Area Under the ROC Curve (AUC) for the test data multiplied by 100.
+        """
         logger = logging.getLogger()
 
         # Set device for network
@@ -134,19 +145,7 @@ class DeepSVDDTrainer(BaseTrainer):
         net.eval()
         with torch.no_grad():
             for data in test_loader:
-                inputs, labels, idx = data
-                inputs = inputs.to(self.device)
-                outputs = net(inputs)
-                dist = torch.sum((outputs - self.c) ** 2, dim=1)
-                if self.objective == 'soft-boundary':
-                    scores = dist - self.R ** 2
-                else:
-                    scores = dist
-
-                # Save triples of (idx, label, score) in a list
-                idx_label_score += list(zip(idx.cpu().data.numpy().tolist(),
-                                            labels.cpu().data.numpy().tolist(),
-                                            scores.cpu().data.numpy().tolist()))
+                idx_label_score += self.calculate_label_score(data, net)
 
         self.test_time = time.time() - start_time
         self.test_scores = idx_label_score
