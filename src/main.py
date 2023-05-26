@@ -87,7 +87,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config, load_model, ob
     logger.info("GPU is available." if torch.cuda.is_available() else "GPU is not available.")
 
     logger.info('Dataset: %s' % dataset_name)
-    logger.info('Normal class: %d' % normal_class)
+    logger.info('Normal class: %d' % normal_class) # this is the # of class the current analyze is going on (0-9)
     logger.info('Network: %s' % net_name)
 
     # If specified, load experiment config from JSON-file
